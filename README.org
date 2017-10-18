@@ -4,6 +4,7 @@ Almost a roguelike-type game structure for the Powershell console.  Written as a
 
 [[http://kland.smilebasicsource.com/i/xlpya.png]]
 
-WASD - move
-Esc - quit
+*** Controls
++ WASD - move
++ Esc - quit
 no bounds checking or anything right now, just a prototype implementation
