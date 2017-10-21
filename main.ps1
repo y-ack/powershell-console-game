@@ -48,8 +48,14 @@ function Main {
         Write-Host $_.Exception -ForegroundColor Red
         Write-Host $_.ScriptStackTrace -ForegroundColor Red
 
-        Write-Host "An Error occurred.  Press any key to continue."
-        $temp = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp")
+        Write-Host "An Error occurred.  Press x to debug or any other key to continue."
+        $temp = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        if ($temp.character -eq "x") {
+            do {
+                $input = Read-Host -Prompt ">>"
+                Invoke-Expression $input
+            } while ($input -ne "quit")
+        }
     } finally {
         Restore-Host-State
     }
@@ -65,26 +71,28 @@ function Game-State {
         [int]$x
         [int]$y
         [Char]$character
+        [bool]$collides = $true
         [ConsoleColor]$ForegroundColor = [ConsoleColor]::White
         [ConsoleColor]$BackgroundColor = [ConsoleColor]::Black
 
-        [void]Left() { $this.x-- }
-        [void]Right() { $this.x++ }
-        [void]Up() { $this.y-- }
-        [void]Down() { $this.y++ }
-        [void]SetX($newX) { $this.x = $newX }
-        [void]SetY($newY) { $this.y = $newY }
-        [void]SetChar($newChar) { $this.character = $newChar }
-        [void]SetForegroundColor($newColor) { $this.ForegroundColor = $newColor }
-        [void]SetBackgroundColor($newColor) { $this.BackgroundColor = $newColor }
-        [void]DrawTo($Buffer) { $Buffer.Set($this) }
+        [void]Update() {}
     }
-    Class PlayerEntity : GameEntity {
+    Class CreatureEntity : GameEntity {
         [State]$state = [State]::Standing
+        [double]$VelocityX
+        [double]$VelocityY
+
         [void]ChangeCharacter([Object]$Character) { 
             
         }
+        [void]Update() {
+            $this.x += $this.VelocityX
+            $this.VelocityX -= $this.VelocityX.CompareTo(0.0)
+            $this.y += $this.VelocityY
+            $this.VelocityY -= $this.VelocityY.CompareTo(0.0)
+        }
     }
+
     Class GameBuffer {
         [System.Management.Automation.Host.BufferCell[,]]$Buffer
         [Byte]$Width = 50
@@ -92,6 +100,7 @@ function Game-State {
         [char]$BlankChar = '.'
         [ConsoleColor]$ForegroundColor = [ConsoleColor]::White
         [ConsoleColor]$BackgroundColor = [ConsoleColor]::Black
+        [Collections.ArrayList]$EntityList = (New-Object System.Collections.ArrayList<>);
 
 
         [void]SetBuffer($NewContents) {
@@ -106,7 +115,17 @@ function Game-State {
                     [System.Management.Automation.Host.BufferCellType]::Complete
                 )
         }
-        [System.Management.Automation.Host.BufferCell]GetBackgroundCell() {
+        [void]RegisterEntity($e) {
+            $this.EntityList.Add($e)
+        }
+        [void]Update() {
+            $this.EntityList | ForEach-Object {
+                $_.Update()
+                $this.Set($_)
+            }
+        }
+
+        [System.Management.Automation.Host.BufferCell]GetBlankCell() {
             return [System.Management.Automation.Host.BufferCell]::new(
                         $this.BlankChar,
                         $this.ForegroundColor,
@@ -116,16 +135,17 @@ function Game-State {
         }
     }
 
-    $player = New-Object PlayerEntity
+    $player = New-Object CreatureEntity
     $player.character = 'Y'
-    $player.SetX(25)
-    $player.SetY(15)
+    $player.x = 24
+    $player.y = 14
     $player.ForegroundColor = [ConsoleColor]::Green
 
     $Buffer = New-Object GameBuffer
+    $Buffer.RegisterEntity($player)
 
     do {
-        Start-Sleep -m 17
+        Start-Sleep -m 17 #TODO: find a better VSYNC?
         $key = Read-Character
         Handle-Input $key
         Update-Field $Buffer
@@ -136,15 +156,16 @@ function Game-State {
 function Read-Character()
 {
     if ($host.ui.RawUI.KeyAvailable) {
-        return $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp")
+        return $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     }
    
     return $null
 }
 
 function Update-Field([GameBuffer]$Buffer) {
-    $Buffer.SetBuffer($Host.Ui.RawUI.NewBufferCellArray($Buffer.Width, $Buffer.Height, $Buffer.GetBackgroundCell()))
-    $player.DrawTo($Buffer)
+    #We cannot access $Host from within $Buffer, nor can we pass it.
+    $Buffer.SetBuffer($Host.Ui.RawUI.NewBufferCellArray($Buffer.Width, $Buffer.Height, $Buffer.GetBlankCell()))
+    $Buffer.Update()
 }
 
 function Draw-Field([GameBuffer]$Buffer) {
@@ -155,10 +176,10 @@ function Draw-Field([GameBuffer]$Buffer) {
 function Handle-Input($key) {
     if ($key -ne $null) {
         switch -regex ($key.Character) {
-            "w" { $player.Up() }
-            "s" { $player.Down() }
-            "a" { $player.Left() }
-            "d" { $player.Right() }
+            "w" { $player.VelocityY -= 1 }
+            "s" { $player.VelocityY += 1 }
+            "a" { $player.VelocityX -= 1 }
+            "d" { $player.VelocityX += 1 }
         }
         if ($key.VirtualKeycode -eq 27) { break } #Escape to quit
     }
