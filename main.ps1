@@ -52,8 +52,7 @@ function Main {
         $temp = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
         if ($temp.character -eq "x") {
             do {
-                $input = Read-Host -Prompt ">>"
-                Invoke-Expression $input
+                $input = Read-Host -Prompt ">>"; Invoke-Expression $input
             } while ($input -ne "quit")
         }
     } finally {
@@ -97,7 +96,8 @@ function Game-State {
         [System.Management.Automation.Host.BufferCell[,]]$Buffer
         # A supporting field of width+2 x height+2 containing collision information
         # boolean type.  the extra dimensions are an outside border. See SetBuffer()
-        [Object[]]$CollisionField
+        [bool[,]]$CollisionField
+        [bool[,]]$emptyCollisionField
         [Byte]$Width = 50
         [Byte]$Height = 30
         [char]$BlankChar = '.'
@@ -106,13 +106,25 @@ function Game-State {
         [Collections.ArrayList]$EntityList = (New-Object System.Collections.ArrayList<>);
 
 
+        GameBuffer() {
+            $this.emptyCollisionField = [bool[,]]::new($this.Height+2, $this.Width+2)
+            for ($i=0;$i-lt$this.Height+2;$i++) {
+                for ($j=0;$j-lt$this.Width+2;$j++) { 
+                    if ($i * $j -eq 0 -or $i -eq $this.Height+1 -or $j -eq $this.Width+1) {
+                        $this.emptyCollisionField[$i,$j] = $True
+                    }
+                }
+            }
+        }
+
         [void]SetBuffer($NewContents) {
             $this.Buffer = $NewContents
-            $this.CollisionField = ,[bool[]](,1 * ($this.Width + 2)) + 
-                                   ,[bool[]](,1 + (,0 * $this.Width) + ,1) * $this.Height +  
-                                   ,[bool[]](,1 * ($this.Width + 2))
+            $this.CollisionField = $this.emptyCollisionField.Clone()
         }
-        [void]Set([GameEntity]$e) {
+        [void]SetCollision([GameEntity]$e) {
+            $this.CollisionField[($e.y+1), ($e.x+1)] = $e.collides
+        }
+        [void]SetBuffer([GameEntity]$e) {
             $this.Buffer[$e.y,$e.x] =
                 [System.Management.Automation.Host.BufferCell]::new(
                     $e.character,
@@ -120,20 +132,20 @@ function Game-State {
                     $e.BackgroundColor, 
                     [System.Management.Automation.Host.BufferCellType]::Complete
                 )
-            $this.CollisionField[$e.y+1][$e.x+1] = $e.collides
         }
         [void]RegisterEntity($e) {
             $this.EntityList.Add($e)
         }
         [void]Update() {
+            $this.EntityList | ForEach-Object { $this.SetCollision($_) }
             $this.EntityList | ForEach-Object {
                 $tX = $_.x; $tY = $_.y
                 $_.Update()
                 #check if there's something in the new position already
-                if ($this.CollisionField[$_.y+1][$_.x+1]) {
+                if ($this.CollisionField[($_.y+1), ($_.x+1)]) {
                     $_.x = $tX; $_.y = $tY #revert to the old position
                 }
-                $this.Set($_) # We set either way because we refresh the buffer every frame
+                $this.SetBuffer($_) # We set either way because we refresh the buffer every frame
             }
         }
 
@@ -153,8 +165,16 @@ function Game-State {
     $player.y = 14
     $player.ForegroundColor = [ConsoleColor]::Green
 
+    $dude = New-Object CreatureEntity
+    $dude.character = "$"
+    $dude.x = 10
+    $dude.y = 16
+    $dude.ForegroundColor = [ConsoleColor]::Cyan
+    $dude.VelocityX=5
+
     $Buffer = New-Object GameBuffer
     $Buffer.RegisterEntity($player)
+    $Buffer.RegisterEntity($dude)
 
     do {
         Start-Sleep -m 17 #TODO: find a better VSYNC?
@@ -183,6 +203,7 @@ function Update-Field([GameBuffer]$Buffer) {
 function Draw-Field([GameBuffer]$Buffer) {
     Clear-Host
     $Host.UI.RawUI.SetBufferContents([System.Management.Automation.Host.Coordinates]::new(0,0), $Buffer.Buffer)
+    if ($drawCollision) { Write-Host ($Buffer.CollisionField | %{[int]$_} ) }
 }
 
 function Handle-Input($key) {
@@ -194,7 +215,10 @@ function Handle-Input($key) {
             "d" { $player.VelocityX += 1 }
         }
         if ($key.VirtualKeycode -eq 27) { break } #Escape to quit
+        if ($key.VirtualKeycode -eq 32) { eval }
     }
 }
+
+function eval() {$input = Read-Host -Prompt ">>"; Invoke-Expression $input}
 
 . Main
