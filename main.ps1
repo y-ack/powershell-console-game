@@ -87,7 +87,7 @@ function Game-State {
         }
         [void]Update() {
             $this.x += $this.VelocityX
-            $this.VelocityX -= $this.VelocityX.CompareTo(0.0)
+            $this.VelocityX -= $this.VelocityX.CompareTo(0.0) # this is a sign check
             $this.y += $this.VelocityY
             $this.VelocityY -= $this.VelocityY.CompareTo(0.0)
         }
@@ -95,6 +95,9 @@ function Game-State {
 
     Class GameBuffer {
         [System.Management.Automation.Host.BufferCell[,]]$Buffer
+        # A supporting field of width+2 x height+2 containing collision information
+        # boolean type.  the extra dimensions are an outside border. See SetBuffer()
+        [Object[]]$CollisionField
         [Byte]$Width = 50
         [Byte]$Height = 30
         [char]$BlankChar = '.'
@@ -105,6 +108,9 @@ function Game-State {
 
         [void]SetBuffer($NewContents) {
             $this.Buffer = $NewContents
+            $this.CollisionField = ,[bool[]](,1 * ($this.Width + 2)) + 
+                                   ,[bool[]](,1 + (,0 * $this.Width) + ,1) * $this.Height +  
+                                   ,[bool[]](,1 * ($this.Width + 2))
         }
         [void]Set([GameEntity]$e) {
             $this.Buffer[$e.y,$e.x] =
@@ -114,14 +120,20 @@ function Game-State {
                     $e.BackgroundColor, 
                     [System.Management.Automation.Host.BufferCellType]::Complete
                 )
+            $this.CollisionField[$e.y+1][$e.x+1] = $e.collides
         }
         [void]RegisterEntity($e) {
             $this.EntityList.Add($e)
         }
         [void]Update() {
             $this.EntityList | ForEach-Object {
+                $tX = $_.x; $tY = $_.y
                 $_.Update()
-                $this.Set($_)
+                #check if there's something in the new position already
+                if ($this.CollisionField[$_.y+1][$_.x+1]) {
+                    $_.x = $tX; $_.y = $tY #revert to the old position
+                }
+                $this.Set($_) # We set either way because we refresh the buffer every frame
             }
         }
 
@@ -146,10 +158,10 @@ function Game-State {
 
     do {
         Start-Sleep -m 17 #TODO: find a better VSYNC?
-        $key = Read-Character
-        Handle-Input $key
         Update-Field $Buffer
         Draw-Field $Buffer
+        $key = Read-Character
+        Handle-Input $key
     } while ($true)
 }
 
