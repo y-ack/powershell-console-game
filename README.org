@@ -7,4 +7,4 @@ Almost a roguelike-type game structure for the Powershell console.  Written as a
 *** Controls
 + WASD - move
 + Esc - quit
-no bounds checking or anything right now, just a prototype implementation
++no bounds checking or anything+ not much right now, just a prototype implementation
