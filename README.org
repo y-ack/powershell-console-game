@@ -6,5 +6,6 @@ Almost a roguelike-type game structure for the Powershell console.  Written as a
 
 *** Controls
 + WASD - move
++ IJKL - fire "bullets"
 + Esc - quit
 +no bounds checking or anything+ not much right now, just a prototype implementation
