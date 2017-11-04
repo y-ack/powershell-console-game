@@ -80,21 +80,37 @@ function Game-State {
         [State]$state = [State]::Standing
         [double]$VelocityX
         [double]$VelocityY
+        [double]$FrictionCoefficient = 1
 
         [void]ChangeCharacter([Object]$Character) { 
             
         }
         [void]Update() {
             $this.x += $this.VelocityX
-            $this.VelocityX -= $this.VelocityX.CompareTo(0.0) # this is a sign check
+            # -----------------------v this is a sign check
+            $this.VelocityX -= $this.VelocityX.CompareTo(0.0) * $this.FrictionCoefficient 
             $this.y += $this.VelocityY
-            $this.VelocityY -= $this.VelocityY.CompareTo(0.0)
+            $this.VelocityY -= $this.VelocityY.CompareTo(0.0) * $this.FrictionCoefficient 
+        }
+    }
+    Class ShootingCreature : CreatureEntity {
+        [GameEntity]Fire([double]$XVel, [double]$YVel) {
+            $bullet = New-Object CreatureEntity
+            $bullet.x = $this.x
+            $bullet.y = $this.y
+            $bullet.VelocityX = $XVel
+            $bullet.VelocityY = $Yvel
+            $bullet.FrictionCoefficient = 0
+            $bullet.character = '*'
+            $bullet.Update() = {$this.x += $this.VelocityX;$this.y += $this.VelocityY;}
+            $this.state = [State]::Attacking
+            return $bullet
         }
     }
 
     Class GameBuffer {
         [System.Management.Automation.Host.BufferCell[,]]$Buffer
-        # A supporting field of width+2 x height+2 containing collision information
+        # A supporting field of width+2 * height+2 containing collision information
         # boolean type.  the extra dimensions are an outside border. See SetBuffer()
         [bool[,]]$CollisionField
         [bool[,]]$emptyCollisionField
@@ -108,8 +124,8 @@ function Game-State {
 
         GameBuffer() {
             $this.emptyCollisionField = [bool[,]]::new($this.Height+2, $this.Width+2)
-            for ($i=0;$i-lt$this.Height+2;$i++) {
-                for ($j=0;$j-lt$this.Width+2;$j++) { 
+            for ($i=0; $i -lt $this.Height+2; $i++) {
+                for ($j=0; $j -lt $this.Width+2; $j++) { 
                     if ($i * $j -eq 0 -or $i -eq $this.Height+1 -or $j -eq $this.Width+1) {
                         $this.emptyCollisionField[$i,$j] = $True
                     }
@@ -159,7 +175,7 @@ function Game-State {
         }
     }
 
-    $player = New-Object CreatureEntity
+    $player = New-Object ShootingCreature
     $player.character = 'Y'
     $player.x = 24
     $player.y = 14
@@ -181,7 +197,7 @@ function Game-State {
         Update-Field $Buffer
         Draw-Field $Buffer
         $key = Read-Character
-        Handle-Input $key
+        Handle-Input $key $Buffer
     } while ($true)
 }
 
@@ -213,6 +229,10 @@ function Handle-Input($key) {
             "s" { $player.VelocityY += 1 }
             "a" { $player.VelocityX -= 1 }
             "d" { $player.VelocityX += 1 }
+            "i" { $Buffer.RegisterEntity($player.fire( 0, -1)) }
+            "k" { $Buffer.RegisterEntity($player.fire( 0,  1)) }
+            "j" { $Buffer.RegisterEntity($player.fire(-1,  0)) }
+            "l" { $Buffer.RegisterEntity($player.fire( 1,  0)) }
         }
         if ($key.VirtualKeycode -eq 27) { break } #Escape to quit
         if ($key.VirtualKeycode -eq 32) { eval }
