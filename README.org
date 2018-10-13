@@ -1,6 +1,6 @@
-Work in progress.
+*No longer receiving development attention -- this project became [[https://github.com/PatheticFish/Aster][Aster]]*
 
-Almost a roguelike-type game structure for the Powershell console.  Written as a prototype.  Might become a real game sometime.
+Almost a roguelike-type game structure for the Powershell console.  Written as a prototype.
 
 [[http://kland.smilebasicsource.com/i/xlpya.png]]
 
