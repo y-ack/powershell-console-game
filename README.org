@@ -1,4 +1,4 @@
-*No longer receiving development attention -- this project became [[https://github.com/PatheticFish/Aster][Aster]]*
+*No longer receiving development attention -- this project became [[https://github.com/y-ack/Aster][Aster]]*
 
 Almost a roguelike-type game structure for the Powershell console.  Written as a prototype.
 
